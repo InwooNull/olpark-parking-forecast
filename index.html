@@ -48,6 +48,7 @@ footer{max-width:980px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:va
       <label><span data-i18n="date">날짜</span><input type="date" id="date"></label>
       <label><span data-i18n="time">도착 시각</span><input type="time" id="time" value="14:00" step="900"></label>
       <label class="chk"><input type="checkbox" id="event"><span data-i18n="eventChk">이날 대형 공연·행사가 있어요</span></label>
+      <label class="chk"><input type="checkbox" id="hol"><span data-i18n="holChk">공휴일이에요(주말 패턴)</span></label>
     </div>
     <div class="result">
       <div class="badge" id="badge">-</div>
@@ -79,30 +80,30 @@ footer{max-width:980px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:va
 <footer id="foot"></footer>
 
 <script>
-const T={ko:{title:"올팍 주차 예보",subtitle:"올림픽공원에 언제 도착하고 언제 나서야 덜 붐빌까? 공공데이터 21만 건으로 미리 봅니다.",q:"방문 계획",date:"날짜",time:"도착 시각",eventChk:"이날 대형 공연·행사가 있어요",curve:"하루 주차 흐름 (예상 동시 주차 대수)",lgOcc:"동시 주차 대수",lgDep:"15분당 출차(나가는 차, 4배 확대 표시)",lgNow:"선택한 도착 시각",zoneT:"주차구역별 만차 기록",monthT:"월별로 보면 (올림픽공원 월 주차대수, 3년)",
+const T={ko:{title:"올팍 주차 예보",subtitle:"올림픽공원에 언제 도착하고 언제 나서야 덜 붐빌까? 공공데이터 21만 건으로 미리 봅니다.",q:"방문 계획",date:"날짜",time:"도착 시각",eventChk:"이날 대형 공연·행사가 있어요",holChk:"공휴일이에요(주말 패턴)",evNote:"행사일 예보는 같은 공연 기간 이틀(2024-07-20·21)의 패턴이라 혼잡도 기록으로 검증되지 않았어요.",curve:"하루 주차 흐름 (예상 동시 주차 대수)",lgOcc:"동시 주차 대수",lgDep:"15분당 출차(나가는 차, 4배 확대 표시)",lgNow:"선택한 도착 시각",zoneT:"주차구역별 만차 기록",monthT:"월별로 보면 (올림픽공원 월 주차대수, 3년)",
  lv:["한산","보통","붐빔","매우 붐빔"],fr:(r)=>`과거 같은 수준 만차 기록 ${r}%`,kind:{weekday:"평일",weekend:"주말",event:"대형 행사일"},
  sum:(k,t,o,lv,r)=>`<b>${t}</b> 도착 기준 ${k} 패턴으로 약 <b>${o.toLocaleString()}대</b>가 이미 주차 중일 것으로 예상돼요. 단계: <b>${lv}</b><br><span style="font-size:13px;color:var(--sub)">예보가 이 수준이었던 때, 주차장 혼잡도 기록의 ${r}%가 만차였어요.</span>`,
  evYes:(l,n)=>`이날 공연 정보 ${n}건: ${l} — 공연 규모는 데이터에 없어요. 대형 공연이면 위 체크를 켜 주세요.`,evNo:"이날 등록된 공연 정보가 없어요. 공연이 있다면 위 체크를 켜 주세요.",evMan:"공연 정보 목록에는 없지만, 대형 행사가 있다고 설정해 행사일 패턴으로 예보해요.",
  tipQuiet:"앞뒤 3시간 안에서 덜 붐비는 도착",better:(t,d)=>`${t} 도착 (약 ${d.toLocaleString()}대 적음)`,same:"지금 고른 시각이 가장 한적해요",tipPeak:"가장 붐비는 시간",tipDep:"나가는 차가 몰리는 시간",tipArr:"들어오는 차가 몰리는 시간",tipAlt:"대안",alt:"매우 붐빔이면 대중교통(지하철 5·9호선 올림픽공원역, 8호선 몽촌토성역)을 권해요.",
  zoneNote:(p,n)=>`주차장 혼잡도 정보 ${n}건(${p[0]}~${p[1]}) 중 '만차'로 기록된 비율입니다. 같은 시각에 모든 구역을 잰 값이 아니라 기록 시점이 구역마다 달라, 경향을 보는 용도로만 쓰세요.`,
  zh:["구역","기록","만차 비율"],months:"월",
- method:(s,r,d)=>`<b>어떻게 계산했나요?</b> ① 2024년 7월 입출차 ${s.entries.toLocaleString()}건으로 15분마다 들어온 차 − 나간 차를 세어 동시 주차 대수를 구했어요(6월에 들어온 차가 빠진 7/1은 제외). ② 날을 평일·주말·대형 행사일(동시 주차 ${r.toLocaleString()}대 이상인 날: ${d.join(", ")}. 같은 공연 기간 이틀이라 표본이 작아요)로 나눠 시간대별 평균을 냈어요. ③ 평일·주말은 2023~2025 월별 주차대수 중앙값 ÷ 2024년 7월 값으로 달마다 보정해요. 대형 행사일은 공연 규모가 좌우하므로 보정하지 않아요. ④ 단계는 주차장 혼잡도 기록 ${D.validation.n}건으로 정했어요. 기록 시점의 예보값 중앙값이 원활 ${D.validation.median_pred["원활"]}대 < 혼잡 ${D.validation.median_pred["혼잡"]}대 < 만차 ${D.validation.median_pred["만차"]}대 순이었고, 900·1,050·1,200대 경계마다 만차 기록 비율이 ${D.calibration.map(c=>Math.round(c.full_rate*100)+"%").join(" → ")}로 올라갔어요(순위상관 ${D.validation.spearman}). <br><b>한계</b>: 입출차는 2024년 7월 한 달분이고 전체 주차면수가 공개되지 않아 몇 % 찼는지가 아니라 과거 기록과 비교한 단계로 보여 줘요. 입출차(${s.entries.toLocaleString()}건)와 월별주차현황(2024년 7월 ${D.month_base_2024_07.toLocaleString()}대)은 집계 기준이 달라 월별 자료는 달 사이 비율만 써요. 실시간 값이 아닌 과거 패턴 예보예요.`,
+ method:(s,r,d)=>`<b>어떻게 계산했나요?</b> ① 2024년 7월 입출차 ${s.entries.toLocaleString()}건으로 15분마다 들어온 차 − 나간 차를 세어 동시 주차 대수를 구했어요(6월에 들어온 차가 빠진 7/1은 제외). ② 날을 평일·주말·대형 행사일(동시 주차 ${r.toLocaleString()}대 이상인 날: ${d.join(", ")}. 같은 공연 기간 이틀이라 표본이 작아요)로 나눠 시간대별 평균을 냈어요. ③ 평일·주말은 2023~2025 월별 주차대수 중앙값 ÷ 2024년 7월 값으로 달마다 보정해요. 대형 행사일은 공연 규모가 좌우하므로 보정하지 않아요. ④ 단계는 주차장 혼잡도 기록 ${D.validation.n}건으로 정했어요. 기록 시점의 예보값 중앙값이 원활 ${D.validation.median_pred["원활"]}대 < 혼잡 ${D.validation.median_pred["혼잡"]}대 < 만차 ${D.validation.median_pred["만차"]}대 순이었고, 900·1,050·1,200대 경계마다 만차 기록 비율이 ${D.calibration.map(c=>Math.round(c.full_rate*100)+"%").join(" → ")}로 올라갔어요(순위상관 ${D.validation.spearman}). 기록을 날짜순으로 반으로 나눠 뒤쪽 절반(${D.holdout.split} 이후 ${D.holdout.later_n}건)만 봐도 만차 비율이 ${D.holdout.later_full_rates.map(r=>Math.round(r*100)+"%").join(" → ")}로 올라갔어요(순위상관 ${D.holdout.later_spearman}). 상관이 강하지는 않아 방향을 알려 주는 참고용이에요. 혼잡도 기록은 구역 단위, 예보는 공원 전체 합계라는 차이도 있어요. <br><b>한계</b>: 입출차는 2024년 7월 한 달분이고 전체 주차면수가 공개되지 않아 몇 % 찼는지가 아니라 과거 기록과 비교한 단계로 보여 줘요. 입출차(${s.entries.toLocaleString()}건)와 월별주차현황(2024년 7월 ${D.month_base_2024_07.toLocaleString()}대)은 집계 기준이 달라 월별 자료는 달 사이 비율만 써요. 실시간 값이 아닌 과거 패턴 예보예요.`,
  foot:"데이터: 한국체육산업개발(주) 공공데이터(data.go.kr) — 올림픽공원 입출차 정보, 주차장 혼잡도 정보, 월별주차현황, 영문 공연정보. 공공누리 이용조건에 따라 활용. 2026 한국체육산업개발 공공데이터 활용 경진대회 출품작."},
-en:{title:"Olympic Park Parking Forecast",subtitle:"When should you arrive and leave Olympic Park to avoid the crowd? A forecast built from 215,000 public records.",q:"Plan your visit",date:"Date",time:"Arrival time",eventChk:"There is a big concert/event that day",curve:"Parking flow of the day (estimated cars parked)",lgOcc:"Cars parked",lgDep:"Cars leaving per 15 min (shown ×4)",lgNow:"Your arrival",zoneT:"Full-lot records by parking zone",monthT:"By month (Olympic Park monthly parking, 3 years)",
+en:{title:"Olympic Park Parking Forecast",subtitle:"When should you arrive and leave Olympic Park to avoid the crowd? A forecast built from 215,000 public records.",q:"Plan your visit",date:"Date",time:"Arrival time",eventChk:"There is a big concert/event that day",holChk:"Public holiday (weekend pattern)",evNote:"The event-day pattern comes from only two days (2024-07-20/21) and is not validated by congestion records.",curve:"Parking flow of the day (estimated cars parked)",lgOcc:"Cars parked",lgDep:"Cars leaving per 15 min (shown ×4)",lgNow:"Your arrival",zoneT:"Full-lot records by parking zone",monthT:"By month (Olympic Park monthly parking, 3 years)",
  lv:["Quiet","Moderate","Busy","Very busy"],fr:(r)=>`Past full-lot rate ${r}%`,kind:{weekday:"weekday",weekend:"weekend",event:"big-event day"},
  sum:(k,t,o,lv,r)=>`Arriving at <b>${t}</b>, about <b>${o.toLocaleString()} cars</b> are expected to be parked already (${k} pattern). Level: <b>${lv}</b><br><span style="font-size:13px;color:var(--sub)">When forecasts were at this level, ${r}% of congestion records said full.</span>`,
  evYes:(l,n)=>`${n} event(s) listed: ${l} — size is unknown. Tick the box if it is a big concert.`,evNo:"No event listed for this date. If there is one, tick the box above.",evMan:"Not in the event list, but you set a big event, so the event-day pattern is used.",
  tipQuiet:"Quieter arrival within ±3 h",better:(t,d)=>`Arrive at ${t} (about ${d.toLocaleString()} fewer cars)`,same:"Your time is already the quietest",tipPeak:"Busiest time",tipDep:"When cars rush out",tipArr:"When cars rush in",tipAlt:"Alternative",alt:"If very busy, take the subway: Olympic Park Stn (Line 5·9) or Mongchontoseong Stn (Line 8).",
  zoneNote:(p,n)=>`Share of 'full' among ${n} congestion records (${p[0]}–${p[1]}). Zones were not measured at the same moments, so use this as a tendency only.`,
  zh:["Zone","Records","Full rate"],months:"",
- method:(s,r,d)=>`<b>How is it calculated?</b> (1) From ${s.entries.toLocaleString()} entry/exit records (July 2024), cars parked = cars in − cars out every 15 minutes (July 1 excluded). (2) Days are grouped into weekday, weekend and big-event days (peak ≥ ${r.toLocaleString()}: ${d.join(", ")}; small sample). (3) Weekdays/weekends are scaled by the 2023–2025 monthly median ÷ July 2024. (4) Levels come from ${D.validation.n} congestion records: forecasts at record times were ordered free ${D.validation.median_pred["원활"]} < busy ${D.validation.median_pred["혼잡"]} < full ${D.validation.median_pred["만차"]}; full-rate by level ${D.calibration.map(c=>Math.round(c.full_rate*100)+"%").join(" → ")} (Spearman ${D.validation.spearman}).<br><b>Limits</b>: one month of entry/exit data and no public capacity figure, so levels are relative. Pattern-based, not real-time.`,
+ method:(s,r,d)=>`<b>How is it calculated?</b> (1) From ${s.entries.toLocaleString()} entry/exit records (July 2024), cars parked = cars in − cars out every 15 minutes (July 1 excluded). (2) Days are grouped into weekday, weekend and big-event days (peak ≥ ${r.toLocaleString()}: ${d.join(", ")}; small sample). (3) Weekdays/weekends are scaled by the 2023–2025 monthly median ÷ July 2024. (4) Levels come from ${D.validation.n} congestion records: forecasts at record times were ordered free ${D.validation.median_pred["원활"]} < busy ${D.validation.median_pred["혼잡"]} < full ${D.validation.median_pred["만차"]}; full-rate by level ${D.calibration.map(c=>Math.round(c.full_rate*100)+"%").join(" → ")} (Spearman ${D.validation.spearman}); on the later half of records alone: ${D.holdout.later_full_rates.map(r=>Math.round(r*100)+"%").join(" → ")} (Spearman ${D.holdout.later_spearman}). The correlation is weak, so treat levels as directional.<br><b>Limits</b>: one month of entry/exit data and no public capacity figure, so levels are relative. Pattern-based, not real-time.`,
  foot:"Data: Korea Sports Promotion Co. (KSPO&CO) open data on data.go.kr — Olympic Park entry/exit, parking congestion, monthly parking, English performance info."}};
 let L="ko",D=null;
 const $=id=>document.getElementById(id);
 const COL=["var(--g)","var(--y)","var(--o)","var(--r)"];
 const hm=s=>`${String(Math.floor(s/4)).padStart(2,"0")}:${String(s%4*15).padStart(2,"0")}`;
 function level(v){const e=D.level_edges;return v<e[0]?0:v<e[1]?1:v<e[2]?2:3}
-function kindOf(dt,ev){if(ev)return"event";const w=dt.getDay();return(w===0||w===6)?"weekend":"weekday"}
+function kindOf(dt,ev){if(ev)return"event";if($("hol").checked)return"weekend";const w=dt.getDay();return(w===0||w===6)?"weekend":"weekday"}
 function render(){
   const t=T[L];document.documentElement.lang=L;
   document.querySelectorAll("[data-i18n]").forEach(e=>{const k=e.dataset.i18n;if(typeof t[k]==="string")e.textContent=t[k]});
@@ -114,8 +115,9 @@ function render(){
   const [hh,mi]=$("time").value.split(":").map(Number),s=Math.min(95,hh*4+Math.floor(mi/15));
   const occ=P.occ.map(v=>v*f),dep=P.dep.map(v=>v*f),o=Math.round(occ[s]),lv=level(o);
   const fr=Math.round(D.calibration[lv].full_rate*100);
-  $("badge").style.background=COL[lv];$("badge").innerHTML=`${t.lv[lv]}<small>${t.fr(fr)}</small>`;
-  $("summary").innerHTML=t.sum(t.kind[k]+(k==="event"?"":(L==="ko"?`(${dt.getMonth()+1}월 보정 ×${f.toFixed(2)})`:` (month ×${f.toFixed(2)})`)),$("time").value,o,t.lv[lv],fr);
+  $("badge").style.background=COL[lv];$("badge").innerHTML=`${t.lv[lv]}<small>${k==="event"?t.kind.event:t.fr(fr)}</small>`;
+  const SUM=t.sum(t.kind[k]+(k==="event"?"":(L==="ko"?`(${dt.getMonth()+1}월 보정 ×${f.toFixed(2)})`:` (month ×${f.toFixed(2)})`)),$("time").value,o,t.lv[lv],fr);
+  $("summary").innerHTML=k==="event"?SUM.replace(/<br><span[\s\S]*<\/span>$/,`<br><span style="font-size:13px;color:var(--sub)">${t.evNote}</span>`):SUM;
   $("evinfo").innerHTML=evList.length?t.evYes(evList.map(x=>x.replace(/</g,"&lt;")).join(" · "),evList.length):(ev?t.evMan:t.evNo);
   const W=900,H=300,pl=48,pr=12,pt=14,pb=34,mx=Math.max(...D.profiles.event.occ)*1.6;
   const X=i=>pl+(W-pl-pr)*i/95,Y=v=>H-pb-(H-pt-pb)*v/mx;
@@ -146,9 +148,9 @@ function render(){
 }
 fetch("data.json").then(r=>r.json()).then(d=>{D=d;
   const now=new Date();$("date").value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
-  const p=new URLSearchParams(location.search);if(p.get("lang")==="en")L="en";if(p.get("date"))$("date").value=p.get("date");if(p.get("time"))$("time").value=p.get("time");if(p.get("event")==="1")$("event").checked=true;
+  const p=new URLSearchParams(location.search);if(p.get("lang")==="en")L="en";if(p.get("date"))$("date").value=p.get("date");if(p.get("time"))$("time").value=p.get("time");if(p.get("event")==="1")$("event").checked=true;if(p.get("hol")==="1")$("hol").checked=true;
   $("date").addEventListener("change",render);
-  ["time","event"].forEach(i=>$(i).addEventListener("input",render));
+  ["time","event","hol"].forEach(i=>$(i).addEventListener("input",render));
   $("lang").onclick=()=>{L=L==="ko"?"en":"ko";render()};
   render();});
 </script>

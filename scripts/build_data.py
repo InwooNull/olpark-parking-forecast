@@ -59,6 +59,13 @@ calib = [{"lo": ([0] + EDGES)[i], "hi": (EDGES + [None])[i], "n": int((lvl == i)
           "full_rate": round(float((cg["혼잡도"][lvl == i] == "만차").mean()), 3),
           "busy_rate": round(float((cg["혼잡도"][lvl == i] != "원활").mean()), 3)} for i in range(4)]
 order = cg["혼잡도"].map({"원활": 0, "혼잡": 1, "만차": 2})
+cgs = cg.sort_values("dt"); half = cgs["dt"].iloc[len(cgs) // 2]
+def _rates(X):
+    l = np.digitize(X["p"], EDGES)
+    return [round(float((X["혼잡도"][l == i] == "만차").mean()), 3) for i in range(4)]
+Bh = cgs[cgs["dt"] >= half]
+holdout = {"split": str(half.date()), "later_n": int(len(Bh)), "later_full_rates": _rates(Bh),
+           "later_spearman": round(float(Bh["p"].corr(Bh["혼잡도"].map({"원활": 0, "혼잡": 1, "만차": 2}), method="spearman")), 3)}
 validation = {"n": int(len(cg)), "spearman": round(float(cg["p"].corr(order, method="spearman")), 3),
               "median_pred": {k: int(v) for k, v in cg.groupby("혼잡도")["p"].median().items()}}
 zones = {}
@@ -85,7 +92,7 @@ out = {
         "monthly": "한국체육산업개발(주)_월별주차현황_20251231 (data.go.kr 15131671), 2023~2025",
         "events": "한국체육산업개발(주)_영문 공연정보_20260901 (data.go.kr 15149169), %d건" % len(pf),
     },
-    "profiles": prof, "level_edges": EDGES, "calibration": calib, "validation": validation, "short_stay_17_21": short_stay, "month_base_2024_07": base, "event_peak_rule": EVENT_PEAK, "event_days_2024_07": event_days,
+    "profiles": prof, "level_edges": EDGES, "calibration": calib, "validation": validation, "holdout": holdout, "short_stay_17_21": short_stay, "month_base_2024_07": base, "event_peak_rule": EVENT_PEAK, "event_days_2024_07": event_days,
     "daypeak_2024_07": {d.strftime("%Y-%m-%d"): int(v) for d, v in daypeak.items()},
     "month_factor": month_factor, "monthly": monthly, "zones": zones, "events": ev_by_date,
     "stats": {"entries": int(len(io)), "daily_mean": round(len(io) / 31), "stay_median_min": round(float(stay.median())),
