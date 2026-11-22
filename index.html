@@ -82,7 +82,7 @@ footer{max-width:980px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:va
 const T={ko:{title:"올팍 주차 예보",subtitle:"올림픽공원에 언제 도착하고 언제 나서야 덜 붐빌까? 공공데이터 21만 건으로 미리 봅니다.",q:"방문 계획",date:"날짜",time:"도착 시각",eventChk:"이날 대형 공연·행사가 있어요",curve:"하루 주차 흐름 (예상 동시 주차 대수)",lgOcc:"동시 주차 대수",lgDep:"15분당 출차(나가는 차, 4배 확대 표시)",lgNow:"선택한 도착 시각",zoneT:"주차구역별 만차 기록",monthT:"월별로 보면 (올림픽공원 월 주차대수, 3년)",
  lv:["여유","보통","혼잡","매우 혼잡"],kind:{weekday:"평일",weekend:"주말",event:"대형 행사일"},
  sum:(k,t,o,lv)=>`<b>${t}</b> 도착 기준 ${k} 패턴으로 약 <b>${o.toLocaleString()}대</b>가 이미 주차 중일 것으로 예상돼요. 등급: <b>${lv}</b>`,
- evYes:(l)=>`이날 공연 정보(공공데이터): ${l}`,evNo:"이날 등록된 공연 정보가 없어요. 공연이 있다면 위 체크를 켜 주세요.",
+ evYes:(l)=>`이날 공연 정보(공공데이터): ${l}`,evNo:"이날 등록된 공연 정보가 없어요. 공연이 있다면 위 체크를 켜 주세요.",evMan:"공연 정보 목록에는 없지만, 대형 행사가 있다고 설정해 행사일 패턴으로 예보해요.",
  tipQuiet:"앞뒤 3시간 안에서 덜 붐비는 도착",better:(t,d)=>`${t} 도착 (약 ${d.toLocaleString()}대 적음)`,same:"지금 고른 시각이 가장 한적해요",tipPeak:"가장 붐비는 시간",tipDep:"나가는 차가 몰리는 시간",tipAlt:"대안",alt:"매우 혼잡이면 대중교통(지하철 5·9호선 올림픽공원역, 8호선 몽촌토성역)을 권해요.",
  zoneNote:(p,n)=>`주차장 혼잡도 정보 ${n}건(${p[0]}~${p[1]}) 중 '만차'로 기록된 비율입니다. 같은 시각에 모든 구역을 잰 값이 아니라 기록 시점이 구역마다 달라, 경향을 보는 용도로만 쓰세요.`,
  zh:["구역","기록","만차 비율"],months:"월",
@@ -91,7 +91,7 @@ const T={ko:{title:"올팍 주차 예보",subtitle:"올림픽공원에 언제 �
 en:{title:"Olympic Park Parking Forecast",subtitle:"When should you arrive and leave Olympic Park to avoid the crowd? A forecast built from 215,000 public records.",q:"Plan your visit",date:"Date",time:"Arrival time",eventChk:"There is a big concert/event that day",curve:"Parking flow of the day (estimated cars parked)",lgOcc:"Cars parked",lgDep:"Cars leaving per 15 min (shown ×4)",lgNow:"Your arrival",zoneT:"Full-lot records by parking zone",monthT:"By month (Olympic Park monthly parking, 3 years)",
  lv:["Easy","Moderate","Busy","Very busy"],kind:{weekday:"weekday",weekend:"weekend",event:"big-event day"},
  sum:(k,t,o,lv)=>`Arriving at <b>${t}</b>, about <b>${o.toLocaleString()} cars</b> are expected to be parked already (${k} pattern). Level: <b>${lv}</b>`,
- evYes:(l)=>`Events on this date (public data): ${l}`,evNo:"No event listed for this date. If there is one, tick the box above.",
+ evYes:(l)=>`Events on this date (public data): ${l}`,evNo:"No event listed for this date. If there is one, tick the box above.",evMan:"Not in the event list, but you set a big event, so the event-day pattern is used.",
  tipQuiet:"Quieter arrival within ±3 h",better:(t,d)=>`Arrive at ${t} (about ${d.toLocaleString()} fewer cars)`,same:"Your time is already the quietest",tipPeak:"Busiest time",tipDep:"When cars rush out",tipAlt:"Alternative",alt:"If very busy, take the subway: Olympic Park Stn (Line 5·9) or Mongchontoseong Stn (Line 8).",
  zoneNote:(p,n)=>`Share of 'full' among ${n} congestion records (${p[0]}–${p[1]}). Zones were not measured at the same moments, so use this as a tendency only.`,
  zh:["Zone","Records","Full rate"],months:"",
@@ -115,7 +115,7 @@ function render(){
   const occ=P.occ.map(v=>v*f),dep=P.dep.map(v=>v*f),o=Math.round(occ[s]),lv=level(o);
   $("badge").style.background=COL[lv];$("badge").innerHTML=`${t.lv[lv]}<small>${t.kind[k]} · ×${f.toFixed(2)}</small>`;
   $("summary").innerHTML=t.sum(t.kind[k],$("time").value,o,t.lv[lv]);
-  $("evinfo").innerHTML=evList.length?t.evYes(evList.map(x=>x.replace(/</g,"&lt;")).join(" · ")):t.evNo;
+  $("evinfo").innerHTML=evList.length?t.evYes(evList.map(x=>x.replace(/</g,"&lt;")).join(" · ")):(ev?t.evMan:t.evNo);
   const W=900,H=300,pl=48,pr=12,pt=14,pb=34,mx=Math.max(...D.profiles.event.occ)*1.6;
   const X=i=>pl+(W-pl-pr)*i/95,Y=v=>H-pb-(H-pt-pb)*v/mx;
   let g="";
