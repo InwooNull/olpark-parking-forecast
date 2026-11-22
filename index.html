@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>올팍 주차 예보 · Olympic Park Parking Forecast</title>
+<meta name="description" content="한국체육산업개발 공공데이터로 만든 올림픽공원 주차 혼잡 예보">
+<style>
+:root{--bg:#F4F7FB;--card:#fff;--ink:#0E2238;--sub:#5B6B7C;--line:#DCE4EE;--blue:#1F5FBF;--g:#2E9E5B;--y:#E3A008;--o:#E8590C;--r:#D62839;--soft:#EAF1FB}
+@media (prefers-color-scheme:dark){:root{--bg:#0F1720;--card:#17212C;--ink:#E8EEF5;--sub:#9AAABB;--line:#2A3846;--soft:#1E2B3A}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;word-break:keep-all;line-height:1.5}
+header{background:var(--blue);color:#fff;padding:18px 16px 22px}
+header .wrap{max-width:980px;margin:0 auto;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+h1{margin:0;font-size:24px;letter-spacing:-.02em}header p{margin:6px 0 0;opacity:.9;font-size:14px}
+.lang{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer;white-space:nowrap}
+main{max-width:980px;margin:-12px auto 40px;padding:0 16px;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.card h2{margin:0 0 10px;font-size:17px}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.ctrl label{display:flex;flex-direction:column;font-size:13px;color:var(--sub);gap:4px}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.chk{flex-direction:row!important;align-items:center;gap:6px!important;padding-bottom:8px}
+.result{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;margin-top:14px}
+.badge{border-radius:14px;padding:14px 18px;color:#fff;font-weight:800;font-size:22px;text-align:center;min-width:120px}
+.badge small{display:block;font-size:12px;font-weight:600;opacity:.95}
+.big{font-size:15px}.big b{font-size:20px}
+.ev{margin-top:8px;font-size:13px;background:var(--soft);border-radius:10px;padding:8px 10px}
+svg{width:100%;height:auto;display:block}
+.tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px}
+.tip{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px}.tip b{display:block;font-size:13px;color:var(--sub);margin-bottom:2px}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.bar{height:10px;border-radius:5px;background:var(--r)}
+.note{font-size:12.5px;color:var(--sub)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+footer{max-width:980px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:var(--sub)}
+@media (max-width:560px){.result{grid-template-columns:1fr}h1{font-size:20px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div><h1 data-i18n="title">올팍 주차 예보</h1><p data-i18n="subtitle">올림픽공원에 언제 도착하고 언제 나서야 덜 붐빌까? 공공데이터 21만 건으로 미리 봅니다.</p></div>
+  <button class="lang" id="lang">English</button>
+</div></header>
+<main>
+  <section class="card">
+    <h2 data-i18n="q">방문 계획</h2>
+    <div class="ctrl">
+      <label><span data-i18n="date">날짜</span><input type="date" id="date"></label>
+      <label><span data-i18n="time">도착 시각</span><input type="time" id="time" value="14:00" step="900"></label>
+      <label class="chk"><input type="checkbox" id="event"><span data-i18n="eventChk">이날 대형 공연·행사가 있어요</span></label>
+    </div>
+    <div class="result">
+      <div class="badge" id="badge">-</div>
+      <div class="big" id="summary"></div>
+    </div>
+    <div class="ev" id="evinfo"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="curve">하루 주차 흐름 (예상 동시 주차 대수)</h2>
+    <svg id="chart" viewBox="0 0 900 300" role="img" aria-label="하루 주차 흐름 그래프"></svg>
+    <div class="legend"><span><i style="background:var(--blue)"></i><span data-i18n="lgOcc">동시 주차 대수</span></span><span><i style="background:var(--o)"></i><span data-i18n="lgDep">15분당 출차(나가는 차)</span></span><span><i style="background:#888"></i><span data-i18n="lgNow">선택한 도착 시각</span></span></div>
+    <div class="tips" id="tips"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="zoneT">주차구역별 만차 기록</h2>
+    <p class="note" id="zoneNote"></p>
+    <table id="zones"></table>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="monthT">월별로 보면 (올림픽공원 월 주차대수, 3년)</h2>
+    <svg id="month" viewBox="0 0 900 220" role="img" aria-label="월별 주차대수 그래프"></svg>
+  </section>
+
+  <section class="card note" id="method"></section>
+</main>
+<footer id="foot"></footer>
+
+<script>
+const T={ko:{title:"올팍 주차 예보",subtitle:"올림픽공원에 언제 도착하고 언제 나서야 덜 붐빌까? 공공데이터 21만 건으로 미리 봅니다.",q:"방문 계획",date:"날짜",time:"도착 시각",eventChk:"이날 대형 공연·행사가 있어요",curve:"하루 주차 흐름 (예상 동시 주차 대수)",lgOcc:"동시 주차 대수",lgDep:"15분당 출차(나가는 차, 4배 확대 표시)",lgNow:"선택한 도착 시각",zoneT:"주차구역별 만차 기록",monthT:"월별로 보면 (올림픽공원 월 주차대수, 3년)",
+ lv:["여유","보통","혼잡","매우 혼잡"],kind:{weekday:"평일",weekend:"주말",event:"대형 행사일"},
+ sum:(k,t,o,lv)=>`<b>${t}</b> 도착 기준 ${k} 패턴으로 약 <b>${o.toLocaleString()}대</b>가 이미 주차 중일 것으로 예상돼요. 등급: <b>${lv}</b>`,
+ evYes:(l)=>`이날 공연 정보(공공데이터): ${l}`,evNo:"이날 등록된 공연 정보가 없어요. 공연이 있다면 위 체크를 켜 주세요.",
+ tipQuiet:"앞뒤 3시간 안에서 덜 붐비는 도착",better:(t,d)=>`${t} 도착 (약 ${d.toLocaleString()}대 적음)`,same:"지금 고른 시각이 가장 한적해요",tipPeak:"가장 붐비는 시간",tipDep:"나가는 차가 몰리는 시간",tipAlt:"대안",alt:"매우 혼잡이면 대중교통(지하철 5·9호선 올림픽공원역, 8호선 몽촌토성역)을 권해요.",
+ zoneNote:(p,n)=>`주차장 혼잡도 정보 ${n}건(${p[0]}~${p[1]}) 중 '만차'로 기록된 비율입니다. 같은 시각에 모든 구역을 잰 값이 아니라 기록 시점이 구역마다 달라, 경향을 보는 용도로만 쓰세요.`,
+ zh:["구역","기록","만차 비율"],months:"월",
+ method:(s,r,d)=>`<b>어떻게 계산했나요?</b> ① 2024년 7월 입출차 ${s.entries.toLocaleString()}건으로 15분마다 '들어온 차 − 나간 차'를 세어 동시 주차 대수를 구했어요. ② 날을 평일·주말·대형 행사일(동시 주차 ${r.toLocaleString()}대 이상인 날: ${d.join(", ")}, 공연정보상 7/20 공연 3건)로 나눠 시간대별 평균을 냈어요. ③ 다른 달은 2023~2025 월별 주차대수 평균을 7월과 비교한 계수로 보정해요. ④ 등급은 7월 전체 15분 값의 50·75·90% 지점을 기준으로 나눴어요. <br><b>한계</b>: 입출차 자료는 2024년 7월 한 달분이고 주차장 전체 면수가 공개되지 않아 '몇 % 찼다'가 아니라 상대 등급으로 보여 줘요. 실시간 값이 아닌 과거 패턴 예보예요.`,
+ foot:"데이터: 한국체육산업개발(주) 공공데이터(data.go.kr) — 올림픽공원 입출차 정보, 주차장 혼잡도 정보, 월별주차현황, 영문 공연정보. 공공누리 이용조건에 따라 활용. 2026 한국체육산업개발 공공데이터 활용 경진대회 출품작."},
+en:{title:"Olympic Park Parking Forecast",subtitle:"When should you arrive and leave Olympic Park to avoid the crowd? A forecast built from 215,000 public records.",q:"Plan your visit",date:"Date",time:"Arrival time",eventChk:"There is a big concert/event that day",curve:"Parking flow of the day (estimated cars parked)",lgOcc:"Cars parked",lgDep:"Cars leaving per 15 min (shown ×4)",lgNow:"Your arrival",zoneT:"Full-lot records by parking zone",monthT:"By month (Olympic Park monthly parking, 3 years)",
+ lv:["Easy","Moderate","Busy","Very busy"],kind:{weekday:"weekday",weekend:"weekend",event:"big-event day"},
+ sum:(k,t,o,lv)=>`Arriving at <b>${t}</b>, about <b>${o.toLocaleString()} cars</b> are expected to be parked already (${k} pattern). Level: <b>${lv}</b>`,
+ evYes:(l)=>`Events on this date (public data): ${l}`,evNo:"No event listed for this date. If there is one, tick the box above.",
+ tipQuiet:"Quieter arrival within ±3 h",better:(t,d)=>`Arrive at ${t} (about ${d.toLocaleString()} fewer cars)`,same:"Your time is already the quietest",tipPeak:"Busiest time",tipDep:"When cars rush out",tipAlt:"Alternative",alt:"If very busy, take the subway: Olympic Park Stn (Line 5·9) or Mongchontoseong Stn (Line 8).",
+ zoneNote:(p,n)=>`Share of 'full' among ${n} congestion records (${p[0]}–${p[1]}). Zones were not measured at the same moments, so use this as a tendency only.`,
+ zh:["Zone","Records","Full rate"],months:"",
+ method:(s,r,d)=>`<b>How is it calculated?</b> (1) From ${s.entries.toLocaleString()} entry/exit records in July 2024, cars parked = cars in − cars out every 15 minutes. (2) Days are grouped into weekday, weekend and big-event days (peak ≥ ${r.toLocaleString()} cars: ${d.join(", ")}). (3) Other months are scaled by the 2023–2025 monthly totals relative to July. (4) Levels use the 50/75/90th percentiles of July values.<br><b>Limits</b>: one month of entry/exit data; total capacity is not public, so levels are relative. This is a pattern-based forecast, not real-time.`,
+ foot:"Data: Korea Sports Promotion Co. (KSPO&CO) open data on data.go.kr — Olympic Park entry/exit, parking congestion, monthly parking, English performance info."}};
+let L="ko",D=null;
+const $=id=>document.getElementById(id);
+const COL=["var(--g)","var(--y)","var(--o)","var(--r)"];
+const hm=s=>`${String(Math.floor(s/4)).padStart(2,"0")}:${String(s%4*15).padStart(2,"0")}`;
+function level(v){const q=D.levels;return v<q[50]?0:v<q[75]?1:v<q[90]?2:3}
+function kindOf(dt,ev){if(ev)return"event";const w=dt.getDay();return(w===0||w===6)?"weekend":"weekday"}
+function render(){
+  const t=T[L];document.documentElement.lang=L;
+  document.querySelectorAll("[data-i18n]").forEach(e=>{const k=e.dataset.i18n;if(typeof t[k]==="string")e.textContent=t[k]});
+  $("lang").textContent=L==="ko"?"English":"한국어";
+  const ds=$("date").value,dt=new Date(ds+"T00:00:00");
+  const evList=D.events[ds]||[];
+  const ev=$("event").checked;
+  const k=kindOf(dt,ev),P=D.profiles[k],f=D.month_factor[dt.getMonth()+1]||1;
+  const [hh,mi]=$("time").value.split(":").map(Number),s=Math.min(95,hh*4+Math.floor(mi/15));
+  const occ=P.occ.map(v=>v*f),dep=P.dep.map(v=>v*f),o=Math.round(occ[s]),lv=level(o);
+  $("badge").style.background=COL[lv];$("badge").innerHTML=`${t.lv[lv]}<small>${t.kind[k]} · ×${f.toFixed(2)}</small>`;
+  $("summary").innerHTML=t.sum(t.kind[k],$("time").value,o,t.lv[lv]);
+  $("evinfo").innerHTML=evList.length?t.evYes(evList.map(x=>x.replace(/</g,"&lt;")).join(" · ")):t.evNo;
+  const W=900,H=300,pl=48,pr=12,pt=14,pb=34,mx=Math.max(...D.profiles.event.occ)*1.6;
+  const X=i=>pl+(W-pl-pr)*i/95,Y=v=>H-pb-(H-pt-pb)*v/mx;
+  let g="";
+  [D.levels[50],D.levels[75],D.levels[90]].forEach((q,i)=>{g+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(q)}" y2="${Y(q)}" stroke="${COL[i+1]}" stroke-dasharray="4 4" stroke-width="1"/>`});
+  for(let h=0;h<=24;h+=3){g+=`<text x="${X(h*4)}" y="${H-12}" font-size="12" text-anchor="middle" fill="currentColor" opacity=".6">${h}${L==="ko"?"시":"h"}</text>`}
+  for(let v=0;v<=mx;v+=500){g+=`<text x="${pl-6}" y="${Y(v)+4}" font-size="11" text-anchor="end" fill="currentColor" opacity=".5">${v}</text>`}
+  g+=dep.map((v,i)=>`<rect x="${X(i)-3}" y="${Y(v*4)}" width="6" height="${H-pb-Y(v*4)}" fill="var(--o)" opacity=".55"/>`).join("");
+  g+=`<path d="M${occ.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join("L")}" fill="none" stroke="var(--blue)" stroke-width="3"/>`;
+  g+=`<line x1="${X(s)}" x2="${X(s)}" y1="${pt}" y2="${H-pb}" stroke="#888" stroke-width="2"/><circle cx="${X(s)}" cy="${Y(occ[s])}" r="6" fill="${COL[lv]}" stroke="#fff" stroke-width="2"/>`;
+  $("chart").innerHTML=g;$("chart").style.color="var(--ink)";
+  let bi=s;for(let i=Math.max(0,s-12);i<=Math.min(95,s+12);i++){if(occ[i]<occ[bi])bi=i}
+  const quietTxt=(bi===s||occ[s]-occ[bi]<30)?t.same:t.better(hm(bi),Math.round(occ[s]-occ[bi]));
+  const pk=occ.indexOf(Math.max(...occ)),dk=dep.indexOf(Math.max(...dep.slice(40)));
+  $("tips").innerHTML=`<div class="tip"><b>${t.tipQuiet}</b>${quietTxt}</div><div class="tip"><b>${t.tipPeak}</b>${hm(pk)} (${Math.round(occ[pk]).toLocaleString()})</div><div class="tip"><b>${t.tipDep}</b>${hm(dk)}–${hm(Math.min(95,dk+2))}</div><div class="tip"><b>${t.tipAlt}</b>${t.alt}</div>`;
+  const z=Object.entries(D.zones).sort((a,b)=>b[1].full_rate-a[1].full_rate);
+  $("zoneNote").textContent=t.zoneNote(D.source.congestion.match(/\d{4}-\d\d-\d\d/g)||["",""],z.reduce((a,b)=>a+b[1].n,0));
+  $("zones").innerHTML=`<tr><th>${t.zh[0]}</th><th>${t.zh[1]}</th><th>${t.zh[2]}</th></tr>`+z.map(([n,v])=>`<tr><td><b>${n}</b></td><td>${v.n}</td><td><div style="display:flex;gap:8px;align-items:center"><div class="bar" style="width:${Math.round(v.full_rate*160)}px"></div>${Math.round(v.full_rate*100)}%</div></td></tr>`).join("");
+  const yrs=Object.keys(D.monthly),cols=["#9DB8E0","#5B8FD6","var(--blue)"],mmx=130000;let mg="";
+  const MX=i=>50+(840)*(i-0.5)/12,MY=v=>190-170*v/mmx;
+  yrs.forEach((y,yi)=>{for(let m=1;m<=12;m++){const v=D.monthly[y][m]||0;mg+=`<rect x="${MX(m)-18+yi*12}" y="${MY(v)}" width="11" height="${190-MY(v)}" fill="${cols[yi]}"/>`}});
+  for(let m=1;m<=12;m++)mg+=`<text x="${MX(m)}" y="210" font-size="12" text-anchor="middle" fill="currentColor" opacity=".6">${m}${t.months}</text>`;
+  mg+=yrs.map((y,yi)=>`<rect x="${680+yi*70}" y="6" width="10" height="10" fill="${cols[yi]}"/><text x="${694+yi*70}" y="15" font-size="12" fill="currentColor">${y}</text>`).join("");
+  const cm=dt.getMonth()+1;mg+=`<rect x="${MX(cm)-22}" y="16" width="44" height="176" fill="none" stroke="#888" stroke-dasharray="3 3"/>`;
+  $("month").innerHTML=mg;$("month").style.color="var(--ink)";
+  $("method").innerHTML=t.method(D.stats,D.event_peak_rule,D.event_days_2024_07);
+  $("foot").textContent=t.foot;
+}
+fetch("data.json").then(r=>r.json()).then(d=>{D=d;
+  const now=new Date();$("date").value=now.toISOString().slice(0,10);
+  const p=new URLSearchParams(location.search);if(p.get("lang")==="en")L="en";if(p.get("date"))$("date").value=p.get("date");if(p.get("time"))$("time").value=p.get("time");if(p.get("event")==="1")$("event").checked=true;
+  $("date").addEventListener("change",()=>{const ds=$("date").value;$("event").checked=!!(D.events[ds]&&D.events[ds].length);render()});
+  ["time","event"].forEach(i=>$(i).addEventListener("input",render));
+  $("lang").onclick=()=>{L=L==="ko"?"en":"ko";render()};
+  if(D.events[$("date").value])$("event").checked=true;
+  render();});
+</script>
+</body>
+</html>
