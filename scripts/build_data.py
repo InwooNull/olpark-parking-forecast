@@ -1,7 +1,7 @@
 """한국체육산업개발 공개 파일데이터 4종 → 앱용 data.json
 입력: data_raw/ (data.go.kr 15138735 입출차, 15164156 혼잡도, 15131671 월별주차현황, 15149169 영문 공연정보)
 """
-import json
+import json, calendar
 from pathlib import Path
 import numpy as np, pandas as pd
 
@@ -39,9 +39,11 @@ q = None  # 등급은 아래 혼잡도 기록으로 보정
 # 월별 계수 (올림픽공원, 3년 평균 / 7월 평균)
 m = rd("15131671_*.csv"); m = m[m["주차장소"] == "올림픽공원"].copy(); m["월"] = m["월"].str.replace("월", "").astype(int)
 # 프로파일은 2024년 7월 값이므로 분모도 2024-07, 이상치 영향을 줄이려고 3년 중앙값 사용
+m["daily"] = [r["주차대수"] / calendar.monthrange(int(r["연도"]), int(r["월"]))[1] for _, r in m.iterrows()]  # 달 길이 차이 제거(일평균)
 base = int(m[(m["연도"] == 2024) & (m["월"] == 7)]["주차대수"].iloc[0])
-mm = m.groupby("월")["주차대수"].median()
-month_factor = {int(k): round(float(v / base), 3) for k, v in mm.items()}
+base_daily = base / 31
+mm = m.groupby("월")["daily"].median()
+month_factor = {int(k): round(float(v / base_daily), 3) for k, v in mm.items()}
 monthly = {int(y): {int(r["월"]): int(r["주차대수"]) for _, r in g.iterrows()} for y, g in m.groupby("연도")}
 
 # 구역별 혼잡도 기록
@@ -59,6 +61,17 @@ calib = [{"lo": ([0] + EDGES)[i], "hi": (EDGES + [None])[i], "n": int((lvl == i)
           "full_rate": round(float((cg["혼잡도"][lvl == i] == "만차").mean()), 3),
           "busy_rate": round(float((cg["혼잡도"][lvl == i] != "원활").mean()), 3)} for i in range(4)]
 order = cg["혼잡도"].map({"원활": 0, "혼잡": 1, "만차": 2})
+# 기준 모델(시각만, 평일·주말·월 구분 없음)과 비교 + 날짜 단위 부트스트랩 95% 구간
+allday = [(a * prof["weekday"]["days"] + b_ * prof["weekend"]["days"]) / (prof["weekday"]["days"] + prof["weekend"]["days"]) for a, b_ in zip(prof["weekday"]["occ"], prof["weekend"]["occ"])]
+cg["h"] = cg["dt"].apply(lambda t: allday[t.hour * 4 + t.minute // 15])
+_o = cg["혼잡도"].map({"원활": 0, "혼잡": 1, "만차": 2}); cg["_o"] = _o
+_rng = np.random.default_rng(0); _days = cg["등록일"].unique(); _g = {d: cg[cg["등록일"] == d] for d in _days}; _rs, _rh = [], []
+for _ in range(1000):
+    _x = pd.concat([_g[d] for d in _rng.choice(_days, len(_days))])
+    _rs.append(_x["p"].corr(_x["_o"], method="spearman")); _rh.append(_x["h"].corr(_x["_o"], method="spearman"))
+baseline = {"hour_only_spearman": round(float(cg["h"].corr(_o, method="spearman")), 3),
+            "model_ci95": [round(float(v), 3) for v in np.percentile(_rs, [2.5, 97.5])],
+            "hour_only_ci95": [round(float(v), 3) for v in np.percentile(_rh, [2.5, 97.5])], "days": int(len(_days))}
 cgs = cg.sort_values("dt"); half = cgs["dt"].iloc[len(cgs) // 2]
 def _rates(X):
     l = np.digitize(X["p"], EDGES)
@@ -92,7 +105,7 @@ out = {
         "monthly": "한국체육산업개발(주)_월별주차현황_20251231 (data.go.kr 15131671), 2023~2025",
         "events": "한국체육산업개발(주)_영문 공연정보_20260901 (data.go.kr 15149169), %d건" % len(pf),
     },
-    "profiles": prof, "level_edges": EDGES, "calibration": calib, "validation": validation, "holdout": holdout, "short_stay_17_21": short_stay, "month_base_2024_07": base, "event_peak_rule": EVENT_PEAK, "event_days_2024_07": event_days,
+    "profiles": prof, "level_edges": EDGES, "calibration": calib, "validation": validation, "holdout": holdout, "baseline": baseline, "short_stay_17_21": short_stay, "month_base_2024_07": base, "event_peak_rule": EVENT_PEAK, "event_days_2024_07": event_days,
     "daypeak_2024_07": {d.strftime("%Y-%m-%d"): int(v) for d, v in daypeak.items()},
     "month_factor": month_factor, "monthly": monthly, "zones": zones, "events": ev_by_date,
     "stats": {"entries": int(len(io)), "daily_mean": round(len(io) / 31), "stay_median_min": round(float(stay.median())),
@@ -100,7 +113,7 @@ out = {
 }
 p = Path(__file__).resolve().parent.parent / "data.json"
 p.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-print("saved", p, p.stat().st_size, "bytes"); print("event days", event_days); print("calib", calib); print("validation", validation); print("short", short_stay)
+print("saved", p, p.stat().st_size, "bytes"); print("event days", event_days); print("calib", calib); print("validation", validation); print("baseline", baseline); print("short", short_stay)
 for k in prof: print(k, prof[k]["days"], "peak", max(prof[k]["occ"]), "at slot", int(np.argmax(prof[k]["occ"])))
 print({z: zones[z]["full_rate"] for z in sorted(zones, key=lambda z: -zones[z]["full_rate"])})
 print(month_factor)
